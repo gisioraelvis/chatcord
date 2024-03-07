@@ -1,22 +1,30 @@
 const users = [];
+const rooms = ["JS", "Go", "Rust"];
 
 // Join user to chat
 function userJoin(id, username, room) {
-  const user = { id, username, room };
+  const user = { id, username, rooms: [room] };
 
-  users.push(user);
+  // a user can belong to multiple rooms
+  const existingUser = users.find((user) => user.username === username);
+  if (existingUser) {
+    existingUser.rooms = [...existingUser.rooms, room];
+    return existingUser;
+  } else {
+    users.push(user);
+  }
 
   return user;
 }
 
 // Get current user
 function getCurrentUser(id) {
-  return users.find(user => user.id === id);
+  return users.find((user) => user.id === id);
 }
 
 // User leaves chat
 function userLeave(id) {
-  const index = users.findIndex(user => user.id === id);
+  const index = users.findIndex((user) => user.id === id);
 
   if (index !== -1) {
     return users.splice(index, 1)[0];
@@ -25,12 +33,14 @@ function userLeave(id) {
 
 // Get room users
 function getRoomUsers(room) {
-  return users.filter(user => user.room === room);
+  return users.filter((user) => user.rooms.includes(room));
 }
 
 module.exports = {
   userJoin,
   getCurrentUser,
   userLeave,
-  getRoomUsers
+  getRoomUsers,
+  users,
+  rooms,
 };
