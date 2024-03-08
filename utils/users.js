@@ -1,5 +1,5 @@
 const users = [];
-const rooms = ["JS", "Go", "Rust"];
+const rooms = ["General", "JS", "Go", "Rust"];
 
 // Join user to chat
 function userJoin(id, username, room) {

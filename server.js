@@ -46,70 +46,75 @@ const botName = "ChatCord Bot";
   io.adapter(createAdapter(pubClient, subClient));
 })();
 
-io.socketsJoin("General");
-
 // Run when client connects
 io.on("connection", (socket) => {
   // console.log(io.of("/").adapter);
 
+  // catch all debug listners
+  socket.onAny((event, ...args) => {
+    console.log(`Incoming event: ${event}, args:`, args);
+  });
+
+  socket.onAnyOutgoing((event, ...args) => {
+    console.log(`Outgoing event: ${event}, args:`, args);
+  });
+
   socket.on("registerUser", ({ username }) => {
-    const user = userJoin(socket.id, username, "General");
-    socket.emit("message", formatMessage(botName, "Welcome to ChatCord!"));
+    const user = userJoin(socket.id, username, rooms[0]);
+    socket.join(rooms[0]);
+    socket.emit("message", {
+      room: rooms[0],
+      message: formatMessage(botName, "Welcome to ChatCord!"),
+    });
+
     // Send users and rooms
-    io.to(socket.id).emit("roomUsers", { rooms: ["General", ...rooms], users });
+    io.to(socket.id).emit("roomUsers", { rooms, users });
 
     // Broadcast when a user connects
-    socket.broadcast.except(socket.id).emit("newUserRegistered", user.username);
-
-    // Broadcast to general room
-    socket.broadcast
-      .to("General")
-      .emit(
-        "message",
-        formatMessage(botName, `${user.username} has joined the chat`)
-      );
+    socket.broadcast.emit("newUserRegistered", user.username);
+    socket.broadcast.emit("message", {
+      room: rooms[0],
+      message: formatMessage(botName, `${user.username} has joined the chat`),
+    });
   });
 
   socket.on("joinRoom", ({ username, room }) => {
     const user = userJoin(socket.id, username, room);
     socket.join(room);
-    // Broadcast when a user connects
-    socket.broadcast
-      .to(room)
-      .emit(
-        "message",
-        formatMessage(botName, `${user.username} has joined the chat`)
-      );
+    // Broadcast to room when a user connects
+    socket.broadcast.to(room).emit("message", {
+      room: room,
+      message: formatMessage(botName, `${user.username} has joined the chat`),
+    });
   });
 
   socket.on("privateMessage", ({ sender, recipient, message }) => {
     const recipientUser = users.find((user) => user.username === recipient);
-    io.to([socket.id, recipientUser.id]).emit(
-      "message",
-      formatMessage(sender, message)
-    );
+    io.to(recipientUser.id).emit("message", {
+      room: sender,
+      message: formatMessage(sender, message),
+    });
   });
 
   socket.on("roomMessage", ({ currentRoom, msg }) => {
     const user = getCurrentUser(socket.id);
-    io.to(currentRoom).emit("message", formatMessage(user.username, msg));
+    io.to(currentRoom).emit("message", {
+      room: currentRoom,
+      message: formatMessage(user.username, msg),
+    });
   });
 
-  // Runs when client disconnects
+  // When client leaves
   socket.on("disconnect", () => {
     const user = userLeave(socket.id);
-
     if (user) {
-      io.to(user.room).emit(
-        "message",
-        formatMessage(botName, `${user.username} has left the chat`)
-      );
-
-      // Send users and room info
-      io.to(user.room).emit("roomUsers", {
-        room: user.room,
-        users: getRoomUsers(user.room),
+      io.to(rooms[0]).emit("message", {
+        room: rooms[0],
+        message: formatMessage(botName, `${user.username} has left the chat`),
       });
+
+      // Send users and rooms
+      io.emit("roomUsers", { rooms, users });
     }
   });
 });
