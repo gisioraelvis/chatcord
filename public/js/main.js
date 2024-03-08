@@ -14,7 +14,6 @@ socket.emit("registerUser", { username });
 
 // Message from server
 socket.on("message", (message) => {
-  console.log(message);
   outputMessage(message);
 
   // Scroll down
@@ -28,7 +27,7 @@ function outputMessage(message) {
   const p = document.createElement("p");
   p.classList.add("meta");
   p.innerText = message.username;
-  p.innerHTML += `<span>${message.time}</span>`;
+  p.innerHTML += `<span> ${message.time}</span>`;
   div.appendChild(p);
   const para = document.createElement("p");
   para.classList.add("text");
@@ -77,19 +76,35 @@ function outputRooms(rooms) {
 // Add users to DOM
 function outputUsers(users) {
   userList.innerHTML = "";
+  // Find the current user
+  const currentUserIndex = users.findIndex(
+    (user) => user.username === username
+  );
+  if (currentUserIndex !== -1) {
+    const currentUser = users.splice(currentUserIndex, 1)[0];
+    const currentUserLi = createUserLi(currentUser);
+    userList.appendChild(currentUserLi);
+  }
+  // Add the rest of the users
   users.forEach((user) => {
-    const li = document.createElement("li");
-    li.innerText = user.username;
-    li.addEventListener("click", () => {
-      document
-        .querySelectorAll("li")
-        .forEach((item) => item.classList.remove("selected"));
-      li.classList.add("selected");
-      currentUser = user.username;
-      currentRoom = null; // Reset selected room
-    });
-    userList.appendChild(li);
+    const userLi = createUserLi(user);
+    userList.appendChild(userLi);
   });
+}
+
+// Create user list item
+function createUserLi(user) {
+  const li = document.createElement("li");
+  li.innerText = user.username;
+  li.addEventListener("click", () => {
+    document
+      .querySelectorAll("li")
+      .forEach((item) => item.classList.remove("selected"));
+    li.classList.add("selected");
+    currentUser = user.username;
+    currentRoom = null; // Reset selected room
+  });
+  return li;
 }
 
 // Update users list
@@ -141,4 +156,13 @@ document.getElementById("leave-btn").addEventListener("click", () => {
     window.location = "../index.html";
   } else {
   }
+});
+
+//  catch-all debug listeners
+socket.onAnyOutgoing((event, ...args) => {
+  console.log(`Outgoing event: ${event}, args:`, args);
+});
+
+socket.onAny((event, ...args) => {
+  console.log(`Incoming event: ${event}, args:`, args);
 });
