@@ -46,51 +46,53 @@ const botName = "ChatCord Bot";
   io.adapter(createAdapter(pubClient, subClient));
 })();
 
-io.socketsJoin("general");
+io.socketsJoin("General");
 
 // Run when client connects
 io.on("connection", (socket) => {
   // console.log(io.of("/").adapter);
 
   socket.on("registerUser", ({ username }) => {
-    const user = userJoin(socket.id, username, "general");
-    socket.join(user.rooms[0]);
+    const user = userJoin(socket.id, username, "General");
     socket.emit("message", formatMessage(botName, "Welcome to ChatCord!"));
-    // Send users and room info
+    // Send users and rooms
     io.to(socket.id).emit("roomUsers", { rooms: ["General", ...rooms], users });
 
-    // Except to the newly registered user, broadcast the username to all other connected users
-    socket.broadcast.except(socket.id).emit("newUserRegistered", user.username);
-  });
-
-  socket.on("joinRoom", ({ username, room }) => {
-    const user = userJoin(socket.id, username, room);
-    const currentRoom = user.rooms.find((r) => r === room);
-    socket.join(currentRoom);
-
     // Broadcast when a user connects
+    socket.broadcast.except(socket.id).emit("newUserRegistered", user.username);
+
+    // Broadcast to general room
     socket.broadcast
-      .to(currentRoom)
+      .to("General")
       .emit(
         "message",
         formatMessage(botName, `${user.username} has joined the chat`)
       );
   });
 
-  // Listen for chat messages
-  socket.on("chatMessage", ({ chatType, room, msg }) => {
-    if (chatType === "private") {
-      const username = users.find((user) => user.id === socket.id).username;
-      const recipientUser = users.find((user) => user.username === room);
-      io.to([socket.id, recipientUser.id]).emit(
+  socket.on("joinRoom", ({ username, room }) => {
+    const user = userJoin(socket.id, username, room);
+    socket.join(room);
+    // Broadcast when a user connects
+    socket.broadcast
+      .to(room)
+      .emit(
         "message",
-        formatMessage(username ?? recipientUser, msg)
+        formatMessage(botName, `${user.username} has joined the chat`)
       );
-    } else {
-      const user = getCurrentUser(socket.id);
-      const currentRoom = user.rooms.find((r) => r === room);
-      io.to(currentRoom).emit("message", formatMessage(user.username, msg));
-    }
+  });
+
+  socket.on("privateMessage", ({ sender, recipient, message }) => {
+    const recipientUser = users.find((user) => user.username === recipient);
+    io.to([socket.id, recipientUser.id]).emit(
+      "message",
+      formatMessage(sender, message)
+    );
+  });
+
+  socket.on("roomMessage", ({ currentRoom, msg }) => {
+    const user = getCurrentUser(socket.id);
+    io.to(currentRoom).emit("message", formatMessage(user.username, msg));
   });
 
   // Runs when client disconnects

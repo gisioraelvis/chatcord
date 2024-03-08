@@ -3,7 +3,7 @@ const chatMessages = document.querySelector(".chat-messages");
 const roomList = document.getElementById("rooms");
 const userList = document.getElementById("users");
 
-const { chatType, username, room } = Qs.parse(location.search, {
+const { username } = Qs.parse(location.search, {
   ignoreQueryPrefix: true,
 });
 
@@ -11,12 +11,6 @@ const socket = io();
 
 // Join chatroom
 socket.emit("registerUser", { username });
-
-// Get room and users
-socket.on("roomUsers", ({ rooms, users }) => {
-  outputRooms(rooms);
-  outputUsers(users);
-});
 
 // Message from server
 socket.on("message", (message) => {
@@ -26,28 +20,6 @@ socket.on("message", (message) => {
   // Scroll down
   chatMessages.scrollTop = chatMessages.scrollHeight;
 });
-
-// Chat form
-chatForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-
-  // Get message text
-  let msg = e.target.elements.msg.value;
-  msg = msg.trim();
-  if (!msg) {
-    return false;
-  }
-  sendMessage(msg);
-
-  // Clear input
-  e.target.elements.msg.value = "";
-  e.target.elements.msg.focus();
-});
-
-function sendMessage(msg) {
-  // Emit message to server
-  socket.emit("chatMessage", { chatType, room, msg });
-}
 
 // Output message to DOM
 function outputMessage(message) {
@@ -65,6 +37,15 @@ function outputMessage(message) {
   document.querySelector(".chat-messages").appendChild(div);
 }
 
+// Get room and users
+socket.on("roomUsers", ({ rooms, users }) => {
+  outputRooms(rooms);
+  outputUsers(users);
+});
+
+let currentUser = null;
+let currentRoom = null;
+
 // Add rooms to DOM
 function outputRooms(rooms) {
   roomList.innerHTML = "";
@@ -72,10 +53,23 @@ function outputRooms(rooms) {
     const li = document.createElement("li");
     li.innerText = rm;
     li.addEventListener("click", () => {
-      li.style.backgroundColor = "lightblue";
-      window.location = `chat.html?chatType=group&username=${username}&room=${rm}`;
+      document
+        .querySelectorAll("li")
+        .forEach((item) => item.classList.remove("selected"));
+      li.classList.add("selected");
+      currentRoom = rm;
+      currentUser = null; // Reset selected user
+
       socket.emit("joinRoom", { username, room: rm });
     });
+
+    // Set General room as default
+    if (rm === "General") {
+      li.classList.add("selected");
+      currentRoom = rm;
+      currentUser = null; // Reset selected user
+    }
+
     roomList.appendChild(li);
   });
 }
@@ -87,8 +81,12 @@ function outputUsers(users) {
     const li = document.createElement("li");
     li.innerText = user.username;
     li.addEventListener("click", () => {
-      li.style.backgroundColor = "lightblue";
-      window.location = `chat.html?chatType=private&username=${username}&room=${user.username}`;
+      document
+        .querySelectorAll("li")
+        .forEach((item) => item.classList.remove("selected"));
+      li.classList.add("selected");
+      currentUser = user.username;
+      currentRoom = null; // Reset selected room
     });
     userList.appendChild(li);
   });
@@ -99,21 +97,44 @@ socket.on("newUserRegistered", (newUsername) => {
   const li = document.createElement("li");
   li.innerText = newUsername;
   li.addEventListener("click", () => {
+    document
+      .querySelectorAll("li")
+      .forEach((item) => item.classList.remove("selected"));
     li.style.backgroundColor = "lightblue";
-    window.location = `chat.html?chatType=private&username=${username}&room=${newUsername}`;
+    currentRoom = null; // Reset selected room
   });
   userList.appendChild(li);
 });
 
-// // Join room
-// roomList.addEventListener("click", (e) => {
-//   if (e.target.tagName === "LI") {
-//     window.location = `chat.html?chatType=${group}&username=${username}&room=${e.target.innerText}`;
-//     socket.emit("joinRoom", { username, room: e.target.innerText });
-//   }
-// });
+// Chat form
+chatForm.addEventListener("submit", (e) => {
+  e.preventDefault();
 
-//Prompt the user before leave chat room
+  // Get message text
+  let msg = e.target.elements.msg.value;
+  msg = msg.trim();
+  if (!msg) {
+    return false;
+  }
+
+  // Check if a user or room is selected
+  if (currentUser) {
+    // Send private message
+    socket.emit("privateMessage", {
+      sender: username,
+      recipient: currentUser,
+      message: msg,
+    });
+  } else if (currentRoom) {
+    socket.emit("roomMessage", { currentRoom, msg });
+  }
+
+  // Clear input
+  e.target.elements.msg.value = "";
+  e.target.elements.msg.focus();
+});
+
+// Prompt the user before leave chat room
 document.getElementById("leave-btn").addEventListener("click", () => {
   const leaveRoom = confirm("Are you sure you want to leave the chatroom?");
   if (leaveRoom) {
